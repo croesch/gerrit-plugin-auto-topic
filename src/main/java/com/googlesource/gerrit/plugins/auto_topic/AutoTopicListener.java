@@ -14,13 +14,12 @@
 package com.googlesource.gerrit.plugins.auto_topic;
 
 import com.google.common.base.Strings;
-import com.google.gerrit.common.ChangeListener;
 import com.google.gerrit.extensions.annotations.Listen;
+import com.google.gerrit.extensions.events.GitReferenceUpdatedListener;
 import com.google.gerrit.reviewdb.client.Change;
 import com.google.gerrit.reviewdb.client.Change.Id;
 import com.google.gerrit.reviewdb.server.ReviewDb;
 import com.google.gerrit.server.ChangeUtil;
-import com.google.gerrit.server.events.ChangeEvent;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.gwtorm.server.AtomicUpdate;
 import com.google.gwtorm.server.OrmException;
@@ -36,14 +35,14 @@ import java.util.regex.Pattern;
 
 @Listen
 @Singleton
-public class AutoTopicListener implements ChangeListener {
+public class AutoTopicListener implements GitReferenceUpdatedListener {
   static final Logger log = LoggerFactory.getLogger(AutoTopicListener.class);
 
   @Inject
   private Provider<ReviewDb> dbProvider;
 
   @Override
-  public void onChangeEvent(ChangeEvent event) {
+  public void onGitReferenceUpdated(Event event) {
     if (event instanceof PatchSetCreatedEvent) {
       PatchSetCreatedEvent patchSetCreatedEvent = (PatchSetCreatedEvent) event;
       if (patchSetCreatedEvent.change.topic != null) {
