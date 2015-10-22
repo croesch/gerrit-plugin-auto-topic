@@ -16,14 +16,13 @@ package com.googlesource.gerrit.plugins.auto_topic;
 import com.google.common.base.Strings;
 import com.google.gerrit.common.EventListener;
 import com.google.gerrit.extensions.annotations.Listen;
-import com.google.gerrit.extensions.events.GitReferenceUpdatedListener;
 import com.google.gerrit.reviewdb.client.Change;
 import com.google.gerrit.reviewdb.client.Change.Id;
 import com.google.gerrit.reviewdb.server.ReviewDb;
 import com.google.gerrit.server.ChangeUtil;
+import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.Event;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
-import com.google.gerrit.server.notedb.ChangeUpdate;
 import com.google.gwtorm.server.AtomicUpdate;
 import com.google.gwtorm.server.OrmException;
 import com.google.inject.Inject;
@@ -41,23 +40,26 @@ import java.util.regex.Pattern;
 public class AutoTopicListener implements EventListener {
   static final Logger log = LoggerFactory.getLogger(AutoTopicListener.class);
 
+  private final Provider<ReviewDb> dbProvider;
+
   @Inject
-  private Provider<ReviewDb> dbProvider;
+  AutoTopicListener(Provider<ReviewDb> db) {
+    this.dbProvider = db;
+  }
 
   @Override
   public void onEvent(Event event) {
     if (event instanceof PatchSetCreatedEvent) {
-      PatchSetCreatedEvent patchSetCreatedEvent = (PatchSetCreatedEvent) event;
-      if (patchSetCreatedEvent.change.topic != null) {
+      ChangeAttribute change = ((PatchSetCreatedEvent) event).change;
+      if (change.topic != null) {
         return;
       }
-      if (patchSetCreatedEvent.change.commitMessage != null) {
+      if (change.commitMessage != null) {
         Pattern pattern = Pattern.compile("^#([0-9]+).*");
-        Matcher matcher =
-            pattern.matcher(patchSetCreatedEvent.change.commitMessage);
+        Matcher matcher = pattern.matcher(change.commitMessage);
         if (matcher.find()) {
           final String topic = matcher.group(1);
-          Integer intId = Integer.valueOf(patchSetCreatedEvent.change.number);
+          Integer intId = Integer.valueOf(change.number);
           Id id = new Change.Id(intId);
           ReviewDb db = dbProvider.get();
           try {
