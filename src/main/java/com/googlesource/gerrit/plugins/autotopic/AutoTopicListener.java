@@ -6,13 +6,13 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gerrit.common.EventListener;
 import com.google.gerrit.extensions.annotations.Listen;
 import com.google.gerrit.extensions.api.GerritApi;
 import com.google.gerrit.extensions.api.changes.ChangeApi;
 import com.google.gerrit.extensions.restapi.RestApiException;
 import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.Event;
+import com.google.gerrit.server.events.EventListener;
 import com.google.gerrit.server.events.PatchSetCreatedEvent;
 import com.google.inject.Inject;
 
@@ -21,6 +21,11 @@ public class AutoTopicListener implements EventListener {
   private static final Logger log = LoggerFactory.getLogger(AutoTopicListener.class);
 
   private final GerritApi api;
+
+  private final String[] issuePatterns = {
+    "^#([0-9]+).*",                        // issue number pattern (e.g #1234)
+    "[\\[{]([a-zA-Z]+-[0-9]+)[\\]}]"       // Jira ticket pattern (e.g [ABC-1234] or {ABC-1234})
+  };
 
   @Inject
   AutoTopicListener(GerritApi api) {
@@ -39,11 +44,17 @@ public class AutoTopicListener implements EventListener {
         // log.info("commit message is null");
         return;
       }
-      Pattern pattern = Pattern.compile("^#([0-9]+).*");
-      Matcher matcher = pattern.matcher(change.commitMessage);
-      if (matcher.find()) {
-        final String topic = matcher.group(1);
+      String topic = null;
+      for (String issuePattern : issuePatterns) {
+        Pattern pattern = Pattern.compile(issuePattern);
+        Matcher matcher = pattern.matcher(change.commitMessage);
+        if (matcher.find()) {
+          topic = matcher.group(1);
+          break;
+        }
+      }
 
+      if (topic != null) {
         change.topic = topic;
         try {
           ChangeApi changeAPI = api.changes().id(change.project, change.branch, change.id);
@@ -52,6 +63,7 @@ public class AutoTopicListener implements EventListener {
             return;
           }
           changeAPI.topic(topic);
+          log.info("Set topic to " + change.topic );
         } catch (RestApiException e) {
           log.error(e.getMessage(), e);
         }
